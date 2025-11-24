@@ -14,19 +14,19 @@
 이 프로젝트는 **Layered Architecture (계층형 아키텍처)**와 **MSA(Microservices Architecture)**의 초기 모델을 따르고 있습니다.
 
 
-graph TD
-    User[User Client] -->|React Frontend| FE[Web Dashboard]
-    FE -->|REST API| API[FastAPI Backend]
+graph TD  
+    User[User Client] -->|React Frontend| FE[Web Dashboard]  
+    FE -->|REST API| API[FastAPI Backend]  
     
-    subgraph "Core Service Layer"
-        API -->|ORM| DB[(PostgreSQL)]
-        API -->|Prediction Request| AI["AI Engine (Prophet)"]
-    end
-    
-    subgraph "Physical AI Operations"
-        DB -->|CDC Stream| Kafka[Kafka / Spark]
-        AI -->|Control Signal| Infra["AWS Auto Scaling / HVAC Control"]
-    end
+
+    subgraph "Core Service Layer"  
+        API -->|ORM| DB[(PostgreSQL)]  
+        API -->|Prediction Request| AI["AI Engine (Prophet)"]  
+        
+  
+    subgraph "Physical AI Operations"  
+        DB -->|CDC Stream| Kafka[Kafka / Spark]  
+        AI -->|Control Signal| Infra["AWS Auto Scaling / HVAC Control"]  
 
 ## 기술 스택  
 Frontend,"React, Vite, Chart.js"  
