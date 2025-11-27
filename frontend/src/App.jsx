@@ -1,6 +1,7 @@
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
 import Community from './pages/Community';
 import Admin from './pages/Admin';
+import Rehabilitation from './pages/Rehabilitation'; // 👈 [추가 1] 파일 임포트
 
 function App() {
   return (
@@ -13,7 +14,8 @@ function App() {
           </div>
           <div style={{ display: 'flex', gap: '20px' }}>
             <Link to="/" style={{ color: 'white', textDecoration: 'none', fontWeight: '500' }}>Community</Link>
-            <Link to="/admin" style={{ color: '#ff6b6b', textDecoration: 'none', fontWeight: '500' }}>Infrastructure (Admin)</Link>
+            <Link to="/rehab" style={{ color: '#4ECDC4', textDecoration: 'none', fontWeight: '500' }}>🧩 AI Rehab</Link> {/* 👈 [추가 2] 메뉴 추가 */}
+            <Link to="/admin" style={{ color: '#ff6b6b', textDecoration: 'none', fontWeight: '500' }}>Infrastructure</Link>
           </div>
         </nav>
 
@@ -21,6 +23,7 @@ function App() {
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
           <Routes>
             <Route path="/" element={<Community />} />
+            <Route path="/rehab" element={<Rehabilitation />} /> {/* 👈 [추가 3] 라우터 등록 */}
             <Route path="/admin" element={<Admin />} />
           </Routes>
         </div>

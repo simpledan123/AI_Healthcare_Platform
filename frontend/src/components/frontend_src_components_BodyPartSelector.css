@@ -1,0 +1,99 @@
+/* frontend/src/components/BodyPartSelector.css */
+
+.body-part-selector {
+  margin: 2rem 0;
+}
+
+.selector-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #2c3e50;
+  margin-bottom: 1.5rem;
+  text-align: center;
+}
+
+.body-parts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.body-part-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem 1rem;
+  border: 3px solid #e0e0e0;
+  border-radius: 16px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.body-part-button:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.body-part-button.selected {
+  transform: translateY(-4px);
+  box-shadow: 0 6px 20px var(--part-color, #4ECDC4);
+}
+
+.part-icon {
+  font-size: 3rem;
+  margin-bottom: 0.5rem;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.body-part-button.selected .part-icon {
+  animation: bounce 0.6s ease-in-out;
+}
+
+.part-name {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #34495e;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+/* 모바일 반응형 */
+@media (max-width: 768px) {
+  .body-parts-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 0.75rem;
+  }
+  
+  .body-part-button {
+    padding: 1rem 0.5rem;
+  }
+  
+  .part-icon {
+    font-size: 2.5rem;
+  }
+  
+  .part-name {
+    font-size: 1rem;
+  }
+}
