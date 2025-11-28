@@ -1,97 +1,433 @@
 # 🏥 Physical AI Healthcare Platform
-### : 데이터 센터의 물리적 제어를 위한 지능형 헬스케어 웹 서비스
 
-## 📖 프로젝트 개요 (Project Overview)
-
-본 프로젝트는 **'Keep'**과 같은 커뮤니티 기반 헬스케어 서비스에서 발생하는 **트래픽 급증(Spike)** 현상에 대응하기 위해, **Physical AI(물리적 AI)** 기술을 도입하여 데이터 센터 인프라를 효율적으로 제어하는 플랫폼입니다.
-
-사용자에게는 **소셜 피트니스 경험**을 제공하고, 관리자에게는 **AI 기반의 인프라 자동 제어(서버 확장, 냉각, 전력 관리)** 대시보드를 제공하여 **서비스 가용성(Availability)**과 **에너지 효율성(PUE)**을 동시에 달성하는 것을 목표로 합니다.
+> AI 기반 맞춤 운동 추천 및 실시간 자세 분석 시스템
 
 ---
 
-## 🏗️ 시스템 아키텍처 (System Architecture)
+## 📖 프로젝트 개요
 
-이 프로젝트는 **Layered Architecture (계층형 아키텍처)**와 **MSA(Microservices Architecture)**의 초기 모델을 따르고 있습니다.
+Physical AI Healthcare Platform은 **Physical AI**와 **Healthcare AI**를 통합한 헬스케어 플랫폼입니다.
 
+### 해결하는 문제
 
-graph TD  
-    User[User Client] -->|React Frontend| FE[Web Dashboard]  
-    FE -->|REST API| API[FastAPI Backend]  
-    
+**1. 인프라 불안정**
+- 헬스케어 서비스는 이벤트 시 트래픽이 급증하며 서비스 가용성이 저하됩니다.
 
-    subgraph "Core Service Layer"  
-        API -->|ORM| DB[(PostgreSQL)]  
-        API -->|Prediction Request| AI["AI Engine (Prophet)"]  
-        
-  
-    subgraph "Physical AI Operations"  
-        DB -->|CDC Stream| Kafka[Kafka / Spark]  
-        AI -->|Control Signal| Infra["AWS Auto Scaling / HVAC Control"]  
+**2. 사용자 경험 부족**
+- 기존 앱은 단순한 운동 목록만 제공하거나, 관절 각도 측정만으로 구체적 피드백을 주지 못합니다.
 
-## 기술 스택  
-Frontend,"React, Vite, Chart.js"  
-Backend,Python FastAPI  
-Database,PostgreSQL  
-Data Ops,Alembic  
-AI Model,Prophet  
+### 우리의 솔루션
 
-## 주요 기능 (Key Features)
-1. 🏃‍♂️ 사용자 모드 (Community & Workout)
-    * **커뮤니티 피드:** 사용자가 게시글을 작성하고 조회하며 트래픽을 발생시킵니다.  
-    * **운동 기록:** 개인의 운동 데이터를 DB에 적재하여 AI 학습 데이터를 제공합니다.  
+```
+Physical AI          +          Healthcare AI
+트래픽 예측/서버 제어           AI 운동 추천/자세 분석
+→ 인프라 안정성               → 사용자 경험 개선
+```
 
-기술적 의의: 트래픽 유발원(Workload Source) 역할을 합니다. 챌린지 이벤트 발생 시 트래픽이 급증하는 시나리오를 시뮬레이션합니다.
+---
 
-2. 🏗️ 관리자 모드 (Physical AI Dashboard)
-기능: 데이터 센터의 실시간 부하, 랙(Rack) 온도, 전력 사용량을 모니터링하고 AI의 제어 예측값을 시각화합니다.
+## 🌟 주요 기능
 
-    **실시간 모니터링:** 현재 활성 사용자 수와 시스템 부하 상태를 3초 단위로 갱신합니다.  
-    **AI 제어 센터 (Control Center):** Prophet 모델이 예측한 **필요 서버 대수**와 그에 따른  **예상 랙(Rack) 온도 및 전력 소모량**을 표시합니다.
+### 1. 🤖 AI 맞춤 운동 추천
 
-Physical AI 제어 로직:
+**Claude Sonnet 4 기반 개인화 추천**
 
-부하 예측: "다음 1시간 뒤 트래픽 급증 예상 -> 서버 5대 추가 증설"
+```
+사용자 입력: 손목 통증, 강도 7/10
+    ↓
+Claude AI 분석
+    ↓
+결과: 3가지 맞춤 운동 + YouTube 링크
+```
 
-물리 제어: "서버 부하 감소 -> CPU 언더클럭킹 및 냉각 팬 속도 저하 -> 전력 절감"
+- 통증 부위 및 강도 분석
+- 의학적 컨텍스트 주입
+- 운동 방법, 세트, 주의사항 제공
+- YouTube 영상 자동 연동
 
-### 3. 🏥 AI 재활 운동 추천 (AI-Powered Rehabilitation)  
-* **기능:** 사용자의 통증 부위와 강도를 입력받아, 생성형 AI(Claude)가 맞춤형 재활 운동 루틴을 처방해 줍니다.  
-* **Architecture Flow:**  
-    1. **Context Injection:** 사용자가 선택한 부위(예: 손목)에 맞는 의학적 배경지식을 프롬프트에 주입합니다.  
+---
 
-    2. **LLM Inference:** AI가 운동법, 세트 수, 주의사항을 생성합니다. 또는 유튜브 영상을 추천합니다.  
-    
-    3. **Hybrid Storage:** 생성된 비정형 운동 데이터는 PostgreSQL의 `JSONB` 컬럼에 저장하여 유연성과 조회 성능을 모두 확보했습니다.  
+### 2. 📹 실시간 자세 분석
 
+**MediaPipe + DTW + 코사인 유사도 기반 정밀 분석**
 
-## 실행
-## 레포지토리 클론
-git clone [https://github.com/simpledan123/Web-load-Prediction.git](https://github.com/simpledan123/Web-load-Prediction.git)
+#### 핵심 기술
+
+| 기술 | 역할 | 효과 |
+|------|------|------|
+| **MediaPipe** | 33개 신체 랜드마크 추출 | 실시간 포즈 인식 |
+| **DTW** (Dynamic Time Warping) | 시간축 정렬 | 속도 차이 보정 |
+| **코사인 유사도** | 포즈 벡터 비교 | 0-100점 정량화 |
+| **정규화** | 어깨 기준 스케일 조정 | 체형 차이 보정 |
+
+#### 분석 결과 예시
+
+```
+✅ 전체 유사도: 82/100점
+🎯 최저 구간: 40% 지점 (65점)
+⏱️ 속도 비율: 1.2x (조금 느림)
+📊 DTW 거리: 0.18
+
+피드백:
+• 전반적으로 잘하고 있습니다
+• 40% 지점에서 자세 개선이 필요합니다
+• 속도를 약간 높여보세요
+```
+
+---
+
+### 3. 🏗️ Physical AI 인프라 제어
+
+**Prophet 기반 트래픽 예측 및 자동 제어**
+
+- 실시간 부하 모니터링 (3초 갱신)
+- 트래픽 패턴 학습 및 예측
+- 서버 자동 증설/감축
+- 에너지 효율 최적화
+
+```
+트래픽 예측 → 서버 제어 → 에너지 절감
+   ↓            ↓            ↓
+Prophet     Auto Scaling   PUE 개선
+```
+
+---
+
+### 4. 💬 커뮤니티
+
+- AI 추천 vs 사용자 방법 비교
+- 효과 평점 및 후기 공유
+- 부위별/타입별 필터링
+- YouTube 링크 공유
+
+---
+
+## 🏗️ 시스템 아키텍처
+
+```
+┌─────────────────────────────────────────┐
+│         React + Vite (Frontend)         │
+└─────────────────────────────────────────┘
+                  ↓ REST API
+┌─────────────────────────────────────────┐
+│          FastAPI (Backend)              │
+│   ┌──────────┬──────────┬──────────┐   │
+│   │ Routers  │ Services │  Models  │   │
+│   └──────────┴──────────┴──────────┘   │
+└─────────────────────────────────────────┘
+        ↓           ↓           ↓
+┌──────────┐ ┌──────────┐ ┌──────────┐
+│ Claude   │ │MediaPipe │ │PostgreSQL│
+│ Sonnet 4 │ │          │ │  + JSONB │
+└──────────┘ └──────────┘ └──────────┘
+```
+
+### 디렉토리 구조
+
+```
+app/
+├── api/
+│   └── routers/              # API 엔드포인트
+│       ├── rehabilitation.py  # AI 운동 추천
+│       ├── pose_comparison.py # 자세 비교
+│       ├── community.py       # 커뮤니티
+│       └── infra.py           # 인프라 모니터링
+├── services/                 # 비즈니스 로직
+│   ├── rehabilitation_ai.py   # Claude API 통신
+│   └── pose_similarity.py     # 자세 분석 알고리즘
+├── models/                   # DB 모델 (SQLAlchemy)
+├── schemas/                  # API 스키마 (Pydantic)
+└── main.py                   # FastAPI 앱
+
+frontend/
+└── src/
+    └── components/
+        ├── ExerciseComparison.jsx  # 자세 비교 UI
+        ├── CommunityFeed.jsx       # 커뮤니티 UI
+        └── Rehabilitation.jsx      # AI 추천 UI
+```
+
+---
+
+## 🛠️ 기술 스택
+
+### Backend
+
+| 카테고리 | 기술 | 역할 | 버전 |
+|---------|------|------|------|
+| **Web Framework** | FastAPI | 고성능 비동기 API 서버 | 0.104+ |
+| **ORM** | SQLAlchemy | 데이터베이스 ORM | 2.0+ |
+| **Database** | PostgreSQL | 관계형 DB (JSONB 지원) | 14+ |
+| **Migration** | Alembic | DB 스키마 버전 관리 | 1.12+ |
+| **Validation** | Pydantic | 데이터 검증 및 직렬화 | 2.5+ |
+
+### AI & ML
+
+| 카테고리 | 기술 | 역할 | 제공 |
+|---------|------|------|------|
+| **LLM** | Claude Sonnet 4 | 운동 추천 생성 | Anthropic |
+| **Computer Vision** | MediaPipe | 실시간 포즈 추정 (33 landmarks) | Google |
+| **Time Series** | Prophet | 트래픽 예측 | Meta |
+| **ML Library** | scikit-learn | 코사인 유사도 계산 | - |
+| **CV Library** | OpenCV | 이미지/영상 처리 | - |
+
+### Frontend
+
+| 카테고리 | 기술 | 역할 | 버전 |
+|---------|------|------|------|
+| **Framework** | React | UI 라이브러리 | 18+ |
+| **Build Tool** | Vite | 빌드 도구 | 5+ |
+| **HTTP Client** | Axios | API 통신 | 1.6+ |
+| **Styling** | Tailwind CSS | CSS 프레임워크 | 3+ |
+
+### 알고리즘
+
+| 알고리즘 | 목적 | 구현 |
+|---------|------|------|
+| **DTW** (Dynamic Time Warping) | 시간축 정렬 (속도 보정) | Python (NumPy) |
+| **코사인 유사도** | 포즈 벡터 유사도 측정 | scikit-learn |
+| **정규화** (Normalization) | 체형 차이 보정 | 어깨 중심 기준 스케일 |
+
+### DevOps & Tools
+
+| 카테고리 | 기술 | 역할 |
+|---------|------|------|
+| **Environment** | Conda | Python 가상환경 |
+| **API Documentation** | Swagger/OpenAPI | 자동 API 문서 생성 |
+| **CORS** | FastAPI Middleware | 크로스 오리진 처리 |
+
+---
+
+## 🚀 설치 및 실행
+
+### 사전 요구사항
+
+- Python 3.10+
+- Node.js 18+
+- PostgreSQL 14+
+- Conda (권장)
+
+### 1. 레포지토리 클론
+
+```bash
+git clone https://github.com/simpledan123/Web-load-Prediction.git
 cd Web-load-Prediction
+```
 
-## 가상환경 생성 및 활성화
-conda create -n de_project python=3.10
-conda activate de_project
+### 2. 백엔드 설정
 
-## 백엔드 패키지 설치
+#### 가상환경 생성 및 패키지 설치
+
+```bash
+conda create -n healthcare python=3.10
+conda activate healthcare
 pip install -r requirements.txt
+```
 
-# 로컬 PostgreSQL에 DB 및 유저 생성 필요 (user_health / health_db)
-# Alembic을 통한 테이블 생성
+#### 환경 변수 설정
+
+```bash
+# .env 파일 생성
+cat > .env << EOF
+ANTHROPIC_API_KEY=your_api_key_here
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=health_db
+DB_USER=user_health
+DB_PASS=your_password
+EOF
+```
+
+#### 데이터베이스 설정
+
+```bash
+# PostgreSQL에 DB 및 유저 생성
+psql -U postgres
+CREATE DATABASE health_db;
+CREATE USER user_health WITH PASSWORD 'your_password';
+GRANT ALL PRIVILEGES ON DATABASE health_db TO user_health;
+\q
+
+# Alembic 마이그레이션 실행
 alembic upgrade head
+```
 
+#### 서버 실행
+
+```bash
 uvicorn app.main:app --reload
-## Swagger 문서 접속  
-[http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+```
 
+**Swagger 문서:** http://localhost:8000/docs
+
+### 3. 프론트엔드 설정
+
+```bash
 cd frontend
 npm install
 npm run dev
-## 웹 접속: http://localhost:5173
+```
 
-## 추후 개발 방향
-Real-time Pipeline: Kafka를 도입하여 DB의 변경 사항(CDC)을 실시간 스트리밍으로 AI 모델에 전달.
+**웹 접속:** http://localhost:5173
 
-Auto Scaling 연동: 현재 시뮬레이션된 제어 로직을 AWS Boto3 또는 Kubernetes HPA와 실제로 연동.
+---
 
-Containerization: Docker 및 Docker Compose를 도입하여 배포 환경 통일.
+## 📊 API 엔드포인트
+
+### Healthcare AI
+
+#### 1. AI 운동 추천
+
+```http
+POST /api/rehabilitation/recommend
+Content-Type: application/json
+
+{
+  "user_id": 1,
+  "pain_area": "손목",
+  "severity": 7,
+  "pain_description": "마우스 사용 후 시큰거림"
+}
+```
+
+**응답:**
+```json
+{
+  "pain_area": "손목",
+  "severity": 7,
+  "exercises": [
+    {
+      "name": "손목 신전 스트레칭",
+      "description": "1. 팔을 앞으로...",
+      "sets": 3,
+      "reps": 10,
+      "duration_seconds": 15,
+      "cautions": ["무리하지 마세요"],
+      "difficulty": "초급",
+      "youtube_keywords": ["손목 스트레칭", "wrist stretch"],
+      "youtube_search_url": "https://youtube.com/..."
+    }
+  ],
+  "general_advice": "하루 2-3회 반복하세요",
+  "estimated_duration_minutes": 10,
+  "medical_disclaimer": "이것은 의료 조언이 아닙니다..."
+}
+```
+
+#### 2. 웹캠 자세 비교
+
+```http
+POST /api/pose-comparison/compare
+Content-Type: multipart/form-data
+
+user_video: <file>
+exercise_id: "wrist_stretch_1"
+sample_rate: 5
+```
+
+**응답:**
+```json
+{
+  "success": true,
+  "overall_similarity": 82,
+  "dtw_distance": 0.18,
+  "frame_similarities": [0.90, 0.85, 0.65, ...],
+  "worst_frame_index": 15,
+  "feedback": [
+    "전반적으로 잘하고 있습니다",
+    "40% 지점에서 자세 개선 필요"
+  ],
+  "speed_ratio": 1.2
+}
+```
+
+#### 3. 실시간 프레임 체크
+
+```http
+POST /api/pose-comparison/realtime-frame-check
+Content-Type: multipart/form-data
+
+frame: <image>
+exercise_id: "wrist_stretch_1"
+frame_index: 0
+```
+
+**응답:**
+```json
+{
+  "success": true,
+  "similarity_score": 82,
+  "feedback": "✅ 완벽합니다!",
+  "color": "green"
+}
+```
+
+### Physical AI
+
+#### 인프라 상태 조회
+
+```http
+GET /infra/status
+```
+
+**응답:**
+```json
+{
+  "active_users": 1250,
+  "total_posts": 8430,
+  "system_status": "High Load",
+  "ai_prediction": {
+    "needed_servers": 8,
+    "rack_temperature_avg": 27.3,
+    "power_usage_watt": 2400
+  }
+}
+```
+
+---
+
+## 📍 개발 현황
+
+### ✅ 완료
+
+- [x] FastAPI 백엔드 아키텍처
+- [x] React 프론트엔드 UI/UX
+- [x] Claude AI 운동 추천 시스템
+- [x] MediaPipe 포즈 추출
+- [x] DTW + 코사인 유사도 알고리즘
+- [x] 실시간 프레임 분석
+- [x] 커뮤니티 기능
+- [x] Physical AI 모니터링 대시보드
+
+### 🚧 진행 중
+
+- [ ] **참조 영상 데이터베이스**
+  - 현재: 알고리즘 검증 단계 (플레이스홀더)
+  - 계획: 실제 시연 영상 추가
+
+### 투명성 공개
+
+참조 영상은 현재 **플레이스홀더** 상태이며, API 응답과 UI에서 이를 명시합니다.
+
+```json
+{
+  "status": "placeholder_phase",
+  "message": "현재는 시스템 검증 단계입니다",
+  "note": "추후 실제 영상으로 업데이트 예정"
+}
+```
+
+---
+
+### 테스트
+
+```bash
+# 백엔드
+pytest tests/
+
+# 프론트엔드
+cd frontend
+npm test
+```
+
+---
