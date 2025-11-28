@@ -29,5 +29,6 @@ class User(Base):
     # 관계 설정
     pain_records = relationship("PainRecord", back_populates="user")
     exercise_logs = relationship("ExerciseLog", back_populates="user")
-    community_posts = relationship("CommunityPost", back_populates="author")
+    community_posts = relationship("CommunityPost", back_populates="user")
     comments = relationship("Comment", back_populates="author")
+    workout_logs = relationship("WorkoutLog", back_populates="owner")

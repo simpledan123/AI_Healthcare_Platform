@@ -1,11 +1,11 @@
 # app/models/community.py
 
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, Float
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, Float, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB, ARRAY
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
-# from app.database import Base
+from app.database import Base
 
 
 class CommunityPost(Base):

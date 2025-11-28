@@ -19,4 +19,4 @@ class WorkoutLog(Base):
     logged_at = Column(DateTime(timezone=True), server_default=func.now())
 
     # 관계 설정 (User 테이블과 연결)
-    owner = relationship("User", back_populates="logs")
+    owner = relationship("User", back_populates="workout_logs")

@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from .database import engine
 from .models import Base
 # 라우터들 import
-from .api.routers import users, community, infra, rehabilitation
+from .api.routers import users, community, infra, rehabilitation, pose_comparison
 
 # 1. DB 테이블 생성 (Alembic을 쓰더라도 개발 편의상 둠)
 Base.metadata.create_all(bind=engine)
@@ -36,6 +36,7 @@ app.include_router(users.router)
 app.include_router(community.router)
 app.include_router(infra.router)
 app.include_router(rehabilitation.router)
+app.include_router(pose_comparison.router)
 
 @app.get("/")
 def root():
