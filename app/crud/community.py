@@ -1,19 +1,19 @@
 from sqlalchemy.orm import Session
 from .. import models, schemas
 
-# 전체 게시글 조회 (최신순) - SNS 피드처럼
-def get_posts(db: Session, skip: int = 0, limit: int = 10):
-    return db.query(models.CommunityPost)\
-             .order_by(models.CommunityPost.created_at.desc())\
+# 운동 기록 조회 (특정 사용자의 기록 목록)
+def get_workouts_by_user(db: Session, user_id: int, skip: int = 0, limit: int = 100):
+    return db.query(models.WorkoutLog)\
+             .filter(models.WorkoutLog.user_id == user_id)\
              .offset(skip).limit(limit).all()
 
-# 게시글 작성
-def create_post(db: Session, post: schemas.PostCreate, user_id: int):
-    db_post = models.CommunityPost(
-        **post.dict(),
-        user_id=user_id
+# 운동 기록 생성
+def create_workout_log(db: Session, workout: schemas.WorkoutCreate, user_id: int):
+    db_workout = models.WorkoutLog(
+        **workout.dict(), # activity_type, duration 등 필드 자동 매핑
+        user_id=user_id   # 어떤 사용자의 기록인지 명시
     )
-    db.add(db_post)
+    db.add(db_workout)
     db.commit()
-    db.refresh(db_post)
-    return db_post
+    db.refresh(db_workout)
+    return db_workout
