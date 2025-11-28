@@ -1,20 +1,21 @@
-# app/routers/rehabilitation.py
+# app/api/routers/rehabilitation.py
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import List
 
-# 스키마 import (실제 경로에 맞게 수정)
-# from app.schemas.rehabilitation import (
-#     ExerciseRecommendationRequest,
-#     RehabilitationRecommendation,
-#     SaveRehabRecordRequest,
-#     RehabRecordResponse,
-#     RehabHistoryResponse
-# )
-# from app.models import RehabilitationRecord, User
-# from app.database import get_db
-# from app.services.rehabilitation_ai import RehabilitationAI
+# ⭐ 수정: 주석 해제 및 경로 수정
+from app.schemas.rehabilitation import (
+    ExerciseRecommendationRequest,
+    RehabilitationRecommendation,
+    SaveRehabRecordRequest,
+    RehabRecordResponse,
+    RehabHistoryResponse
+)
+from app.models.rehabilitation import RehabilitationRecord
+from app.models.user import User
+from app.database import get_db
+from app.services.rehabilitation_ai import RehabilitationAI
 
 router = APIRouter(
     prefix="/api/rehabilitation",

@@ -1,4 +1,4 @@
-# app/routers/pose_comparison.py
+# app/api/routers/pose_comparison.py
 
 from fastapi import APIRouter, UploadFile, File, HTTPException, status, Form
 from fastapi.responses import JSONResponse
@@ -8,7 +8,8 @@ from typing import Optional
 import tempfile
 import os
 
-from app.services.pose_similarity import (
+# ⭐ 수정: 상대 경로로 import
+from ...services.pose_similarity import (
     PoseSimilarityAnalyzer,
     ReferenceVideoDatabase
 )
