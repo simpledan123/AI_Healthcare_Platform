@@ -2,7 +2,7 @@ from pydantic import BaseModel
 from typing import List, Optional
 from datetime import datetime
 from .workout import Workout  # 같은 폴더의 workout.py에서 가져옴
-from .community import Post   # 같은 폴더의 community.py에서 가져옴
+#from .community import Post   # 같은 폴더의 community.py에서 가져옴
 
 # [기본]
 class UserBase(BaseModel):
@@ -24,7 +24,7 @@ class User(UserBase):
     
     # 1:N 관계 데이터 포함 (기본값은 빈 리스트)
     logs: List[Workout] = []
-    posts: List[Post] = []
+    #posts: List[PostResponse] = []
 
     class Config:
         from_attributes = True

@@ -4,6 +4,7 @@ from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, T
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime
+from ..database import Base
 
 # 기존 Base를 import 한다고 가정
 # from app.database import Base

@@ -1,10 +1,11 @@
 """
 User Model - 사용자 정보 및 프로필
 """
+from ..database import Base
 from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
-from ..database import Base
+
 
 
 class User(Base):

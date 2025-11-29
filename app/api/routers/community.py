@@ -16,11 +16,11 @@ def get_db():
         db.close()
 
 # [피드 조회]
-@router.get("/feed", response_model=List[schemas.Post])
+@router.get("/feed", response_model=List[schemas.PostResponse])
 def read_feed(skip: int = 0, limit: int = 10, db: Session = Depends(get_db)):
     return crud.community.get_posts(db, skip=skip, limit=limit)
 
 # [글 작성]
-@router.post("/posts/{user_id}", response_model=schemas.Post)
-def create_post(user_id: int, post: schemas.PostCreate, db: Session = Depends(get_db)):
+@router.post("/posts/{user_id}", response_model=schemas.PostResponse)
+def create_post(user_id: int, post: schemas.CreatePostRequest, db: Session = Depends(get_db)):
     return crud.community.create_post(db=db, post=post, user_id=user_id)
