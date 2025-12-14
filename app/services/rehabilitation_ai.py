@@ -12,9 +12,9 @@ client = Anthropic(
 
 
 class RehabilitationAI:
-    """AI 기반 운동 추천 엔진 (커뮤니티 연계)"""
+    """AI 기반 운동 추천 엔진 (정규화 버전)"""
     
-    # 부위별 기본 정보 (의료 전문 용어 제거)
+    # 부위별 기본 정보
     PAIN_AREA_INFO = {
         "손목": "컴퓨터 작업, 스마트폰 사용",
         "어깨": "잘못된 자세, 장시간 앉아있기",
@@ -31,15 +31,10 @@ class RehabilitationAI:
         severity: int
     ) -> Dict:
         """
-        AI 기반 운동 추천 + 유튜브 리소스 제공
+        AI 기반 운동 추천
         
-        Args:
-            pain_area: 통증 부위
-            pain_description: 통증 상세 설명
-            severity: 통증 강도 (1-10)
-            
-        Returns:
-            추천 운동 정보 + 유튜브 링크
+        정규화된 구조에 맞게 exercises를 리스트로 반환
+        (DB 저장은 API 레이어에서 처리)
         """
         
         # 컨텍스트 정보
@@ -48,7 +43,7 @@ class RehabilitationAI:
             "일반적인 근육 통증"
         )
         
-        # 프롬프트 구성 (의료 전문가 페르소나 제거)
+        # 프롬프트 구성
         prompt = f"""
 다음 정보를 바탕으로 스트레칭 및 운동을 추천해주세요.
 
@@ -61,17 +56,16 @@ class RehabilitationAI:
 **중요 안내:**
 - 이것은 의료 조언이 아닙니다
 - 심한 통증이나 부상이 의심되면 반드시 의료 전문가와 상담하세요
-- 제시되는 운동은 일반적인 스트레칭 및 근력 운동입니다
 
 **요구사항:**
 1. 해당 부위에 도움이 될 수 있는 3-5가지 스트레칭/운동을 추천하세요
 2. 각 운동은 다음 정보를 포함:
    - 운동 이름
-   - 실행 방법 (간단 명료하게)
+   - 실행 방법 (간단 명료하게, 줄바꿈 \\n 사용)
    - 권장 세트/횟수 또는 유지 시간
-   - 주의사항
+   - 주의사항 (배열)
    - 난이도 (쉬움/보통/어려움)
-   - YouTube 검색 키워드 (한글 + 영어, 실제 검색 가능한 키워드)
+   - YouTube 검색 키워드 (한글 + 영어)
 3. 통증 강도({severity}/10)를 고려한 일반적인 조언
 
 **출력 형식 (JSON만 출력):**
@@ -88,12 +82,11 @@ class RehabilitationAI:
       "youtube_keywords": ["손목 스트레칭", "wrist stretch"]
     }}
   ],
-  "general_advice": "일반적인 조언 (하루 권장 횟수, 주의사항 등)",
-  "estimated_duration_minutes": 10,
-  "medical_disclaimer": "심한 통증이나 증상이 지속되면 의료 전문가와 상담하세요."
+  "general_advice": "일반적인 조언",
+  "estimated_duration_minutes": 10
 }}
 
-**반드시 유효한 JSON만 출력하세요. 다른 설명이나 마크다운 코드 블록(```)은 사용하지 마세요.**
+**반드시 유효한 JSON만 출력하세요. 마크다운(```)은 사용하지 마세요.**
 """
 
         try:
@@ -108,8 +101,6 @@ class RehabilitationAI:
             
             # 응답 파싱
             response_text = message.content[0].text.strip()
-            
-            # JSON 파싱 (마크다운 제거)
             response_text = response_text.replace("```json", "").replace("```", "").strip()
             recommendation = json.loads(response_text)
             
@@ -117,13 +108,14 @@ class RehabilitationAI:
             recommendation["pain_area"] = pain_area
             recommendation["severity"] = severity
             
-            # 유튜브 링크 생성
+            # 각 운동에 유튜브 검색 URL 생성
             for exercise in recommendation["exercises"]:
-                if "youtube_keywords" in exercise:
-                    # 첫 번째 키워드로 검색 URL 생성
+                if "youtube_keywords" in exercise and len(exercise["youtube_keywords"]) > 0:
                     primary_keyword = exercise["youtube_keywords"][0]
                     search_url = f"https://www.youtube.com/results?search_query={primary_keyword.replace(' ', '+')}"
                     exercise["youtube_search_url"] = search_url
+                else:
+                    exercise["youtube_search_url"] = None
             
             return recommendation
             
@@ -158,6 +150,5 @@ class RehabilitationAI:
                 }
             ],
             "general_advice": "하루 2-3회 반복하며, 증상이 지속되면 전문가와 상담하세요.",
-            "estimated_duration_minutes": 10,
-            "medical_disclaimer": "이것은 의료 조언이 아닙니다. 심각한 증상은 반드시 의료 전문가와 상담하세요."
+            "estimated_duration_minutes": 10
         }

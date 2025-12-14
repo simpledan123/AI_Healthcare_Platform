@@ -3,6 +3,6 @@
 from ..database import Base
 from .user import User
 from .workout import WorkoutLog
-from .community import CommunityPost
-# 재활 모델이 있다면 아래 주석 해제
+from .community import CommunityPost, PostLike, PostComment
 from .rehabilitation import RehabilitationRecord
+from .exercise_recommendation import ExerciseRecommendation  # 추가!
