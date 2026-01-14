@@ -21,3 +21,5 @@ alembic.ini
 .vscode/
 .idea/
 data/
+
+docs/

@@ -4,20 +4,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 
-from app.api.routers import (
-    rehabilitation,
-    pose_comparison,
-    infra,
-    community,
-    analytics  # 새로 추가
-)
+# 개별 임포트 대신 통합된 api_router를 임포트합니다.
+from app.api import api_router
 
 # 로깅 설정
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-
 logger = logging.getLogger(__name__)
 
 # FastAPI 앱 생성
@@ -32,43 +26,15 @@ app = FastAPI(
 # CORS 설정
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],  # React dev server
+    allow_origins=["http://localhost:5173", "http://localhost:3000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# 라우터 등록
-app.include_router(
-    rehabilitation.router,
-    prefix="/rehabilitation",
-    tags=["Rehabilitation AI"]
-)
-
-app.include_router(
-    pose_comparison.router,
-    prefix="/pose",
-    tags=["Pose Comparison"]
-)
-
-app.include_router(
-    infra.router,
-    prefix="/infra",
-    tags=["Infrastructure Monitoring"]
-)
-
-app.include_router(
-    community.router,
-    prefix="/community",
-    tags=["Community"]
-)
-
-app.include_router(
-    analytics.router,  # 새로 추가!
-    prefix="/analytics",
-    tags=["Analytics & Statistics"]
-)
-
+# 라우터 등록: 개별 등록 대신 api_router 하나로 모든 경로를 등록합니다.
+# /api/v1 등의 프리픽스를 붙여 버전 관리를 할 수도 있습니다.
+app.include_router(api_router)
 
 @app.get("/")
 def root():
@@ -76,17 +42,8 @@ def root():
     return {
         "message": "Physical AI Healthcare Platform API",
         "version": "1.0.0",
-        "endpoints": {
-            "rehabilitation": "/rehabilitation",
-            "pose_comparison": "/pose",
-            "infrastructure": "/infra",
-            "community": "/community",
-            "analytics": "/analytics",  # 새로 추가!
-            "docs": "/docs",
-            "redoc": "/redoc"
-        }
+        "status": "online"
     }
-
 
 @app.get("/health")
 def health_check():
@@ -101,21 +58,16 @@ def health_check():
         }
     }
 
-
 @app.on_event("startup")
 async def startup_event():
     """서버 시작 시 실행"""
     logger.info("=" * 50)
     logger.info("Physical AI Healthcare Platform API Starting...")
     logger.info("=" * 50)
-    logger.info("Available routes:")
-    logger.info("  - Rehabilitation AI: /rehabilitation")
-    logger.info("  - Pose Comparison: /pose")
-    logger.info("  - Infrastructure: /infra")
-    logger.info("  - Community: /community")
-    logger.info("  - Analytics: /analytics")  # 새로 추가!
+    # 개별 경로 로그는 api_router 설정에 따라 자동으로 관리되므로 
+    # 여기서는 서비스 시작 메시지만 간단히 출력해도 충분합니다.
+    logger.info("API System Ready")
     logger.info("=" * 50)
-
 
 @app.on_event("shutdown")
 async def shutdown_event():
