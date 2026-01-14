@@ -20,3 +20,4 @@ alembic.ini
 # IDE
 .vscode/
 .idea/
+data/

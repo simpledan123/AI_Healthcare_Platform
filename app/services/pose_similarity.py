@@ -6,67 +6,98 @@ import numpy as np
 from typing import Dict, List, Tuple, Optional
 from sklearn.metrics.pairwise import cosine_similarity
 import json
+import logging
+
+# 전처리 파이프라인 import
+from .pose_preprocessing import PoseDataProcessor
 
 mp_pose = mp.solutions.pose
 mp_drawing = mp.solutions.drawing_utils
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 class PoseSimilarityAnalyzer:
     """
-    참조 영상과 사용자 동작의 유사도 비교 시스템
+    참조 영상과 사용자 동작의 유사도 비교 시스템 (전처리 강화 버전)
     
-    핵심 아이디어:
-    1. 참조 영상(reference video)의 포즈 시퀀스 추출
-    2. 사용자 웹캠 영상의 포즈 시퀀스 추출
-    3. DTW(Dynamic Time Warping)로 시간 정렬 후 유사도 계산
+    핵심 기능:
+    1. MediaPipe로 포즈 추출
+    2. 데이터 전처리 (이상치 제거, 스무딩)
+    3. DTW로 시간 정렬
+    4. 코사인 유사도 계산
     """
     
-    def __init__(self):
+    def __init__(self, enable_preprocessing: bool = True):
+        """
+        Args:
+            enable_preprocessing: 전처리 파이프라인 활성화 여부
+        """
         self.pose_detector = mp_pose.Pose(
             static_image_mode=False,
             model_complexity=2,
             min_detection_confidence=0.5,
             min_tracking_confidence=0.5
         )
+        
+        # 전처리 파이프라인
+        self.enable_preprocessing = enable_preprocessing
+        if enable_preprocessing:
+            self.preprocessor = PoseDataProcessor(confidence_threshold=0.5)
+            logger.info("Preprocessing pipeline enabled")
+        else:
+            self.preprocessor = None
+            logger.info("Preprocessing pipeline disabled")
     
-    def extract_pose_landmarks(self, frame: np.ndarray) -> Optional[np.ndarray]:
+    def extract_pose_landmarks(
+        self, 
+        frame: np.ndarray
+    ) -> Tuple[Optional[np.ndarray], Optional[np.ndarray]]:
         """
         프레임에서 포즈 랜드마크 추출
         
         Returns:
-            33개 랜드마크 × 3차원(x, y, z) = 99차원 벡터
-            None if 포즈 감지 실패
+            landmarks: 33개 랜드마크 × 3차원 = 99차원 벡터
+            visibility_scores: 각 랜드마크의 신뢰도 점수
         """
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = self.pose_detector.process(frame_rgb)
         
         if not results.pose_landmarks:
-            return None
+            return None, None
         
         # 랜드마크를 numpy 배열로 변환
         landmarks = []
+        visibility_scores = []
+        
         for landmark in results.pose_landmarks.landmark:
             landmarks.extend([landmark.x, landmark.y, landmark.z])
+            visibility_scores.append(landmark.visibility)
         
-        return np.array(landmarks)
+        return np.array(landmarks), np.array(visibility_scores)
     
     def extract_video_pose_sequence(
         self, 
         video_path: str,
-        sample_rate: int = 5
-    ) -> List[np.ndarray]:
+        sample_rate: int = 5,
+        apply_preprocessing: bool = True
+    ) -> Dict:
         """
-        영상에서 포즈 시퀀스 추출
+        영상에서 포즈 시퀀스 추출 (전처리 포함)
         
         Args:
             video_path: 영상 파일 경로
-            sample_rate: N프레임마다 샘플링 (5 = 매 5프레임)
+            sample_rate: N프레임마다 샘플링
+            apply_preprocessing: 전처리 적용 여부
         
         Returns:
-            포즈 벡터 리스트
+            결과 딕셔너리 (원본, 정제, 스무딩 시퀀스 포함)
         """
         cap = cv2.VideoCapture(video_path)
-        pose_sequence = []
+        
+        raw_sequence = []
+        visibility_sequence = []
         frame_count = 0
         
         while cap.isOpened():
@@ -74,39 +105,87 @@ class PoseSimilarityAnalyzer:
             if not ret:
                 break
             
-            # 샘플링 (모든 프레임 분석하면 너무 느림)
+            # 샘플링
             if frame_count % sample_rate == 0:
-                pose = self.extract_pose_landmarks(frame)
+                pose, visibility = self.extract_pose_landmarks(frame)
                 if pose is not None:
-                    pose_sequence.append(pose)
+                    raw_sequence.append(pose)
+                    visibility_sequence.append(visibility)
             
             frame_count += 1
         
         cap.release()
-        return pose_sequence
+        
+        logger.info(f"Extracted {len(raw_sequence)} raw frames from {frame_count} total frames")
+        
+        # 전처리 적용
+        result = {
+            "raw_sequence": raw_sequence,
+            "n_raw_frames": len(raw_sequence)
+        }
+        
+        if apply_preprocessing and self.preprocessor and len(raw_sequence) > 0:
+            # 1. 정제 (이상치 제거)
+            cleaned_sequence, cleaning_stats = self.preprocessor.clean_sequence(
+                raw_sequence,
+                visibility_sequence
+            )
+            
+            # 2. 스무딩
+            smoothed_sequence = self.preprocessor.smooth_sequence(
+                cleaned_sequence,
+                window_length=5,
+                polyorder=2
+            )
+            
+            # 3. 정규화
+            normalized_sequence = [
+                self.preprocessor.normalize_pose(pose) 
+                for pose in smoothed_sequence
+            ]
+            
+            # 4. 특징 추출
+            features = self.preprocessor.extract_features(normalized_sequence)
+            
+            result.update({
+                "cleaned_sequence": cleaned_sequence,
+                "smoothed_sequence": smoothed_sequence,
+                "normalized_sequence": normalized_sequence,
+                "n_cleaned_frames": len(cleaned_sequence),
+                "n_smoothed_frames": len(smoothed_sequence),
+                "cleaning_stats": cleaning_stats,
+                "features": {
+                    "n_frames": features.get("n_frames", 0),
+                    "angles_mean": features.get("angles_mean", {}),
+                    "angles_std": features.get("angles_std", {}),
+                }
+            })
+            
+            logger.info(f"Preprocessing complete: {cleaning_stats}")
+        else:
+            # 전처리 없이 정규화만
+            result["normalized_sequence"] = [
+                self.normalize_pose(pose) for pose in raw_sequence
+            ]
+        
+        return result
     
     def normalize_pose(self, pose: np.ndarray) -> np.ndarray:
         """
-        포즈 정규화 (크기, 위치 불변성)
-        
-        - 어깨 중심을 원점으로 이동
-        - 어깨 너비로 스케일 조정
+        포즈 정규화 (전처리 파이프라인 사용 또는 기본 정규화)
         """
-        pose_reshaped = pose.reshape(-1, 3)
+        if self.preprocessor:
+            return self.preprocessor.normalize_pose(pose)
         
-        # 어깨 중심점 (left shoulder: 11, right shoulder: 12)
+        # 기본 정규화
+        pose_reshaped = pose.reshape(-1, 3)
         left_shoulder = pose_reshaped[11]
         right_shoulder = pose_reshaped[12]
         center = (left_shoulder + right_shoulder) / 2
-        
-        # 중심 이동
         pose_reshaped = pose_reshaped - center
-        
-        # 어깨 너비로 스케일 조정
         shoulder_width = np.linalg.norm(left_shoulder - right_shoulder)
         if shoulder_width > 0:
             pose_reshaped = pose_reshaped / shoulder_width
-        
         return pose_reshaped.flatten()
     
     def calculate_pose_similarity(
@@ -115,7 +194,7 @@ class PoseSimilarityAnalyzer:
         pose2: np.ndarray
     ) -> float:
         """
-        두 포즈 간 유사도 계산
+        두 포즈 간 유사도 계산 (코사인 유사도)
         
         Returns:
             0.0 ~ 1.0 (1.0 = 완전히 동일)
@@ -130,7 +209,7 @@ class PoseSimilarityAnalyzer:
             pose2_norm.reshape(1, -1)
         )[0][0]
         
-        # 0~1 범위로 조정 (-1~1 → 0~1)
+        # 0~1 범위로 조정
         similarity = (similarity + 1) / 2
         
         return float(similarity)
@@ -142,8 +221,6 @@ class PoseSimilarityAnalyzer:
     ) -> float:
         """
         Dynamic Time Warping으로 시퀀스 간 거리 계산
-        
-        서로 다른 속도로 수행된 동작을 비교할 때 유용
         """
         n, m = len(sequence1), len(sequence2)
         
@@ -172,13 +249,14 @@ class PoseSimilarityAnalyzer:
     def compare_with_reference(
         self,
         user_sequence: List[np.ndarray],
-        reference_sequence: List[np.ndarray]
+        reference_sequence: List[np.ndarray],
+        include_preprocessing_stats: bool = True
     ) -> Dict:
         """
         사용자 동작과 참조 영상 비교
         
         Returns:
-            유사도 점수 및 상세 피드백
+            유사도 점수, 상세 피드백, 전처리 통계
         """
         if len(user_sequence) == 0:
             return {
@@ -199,7 +277,7 @@ class PoseSimilarityAnalyzer:
         similarity_score = int((1 - dtw_dist) * 100)
         similarity_score = max(0, min(100, similarity_score))
         
-        # 프레임별 유사도 계산 (피드백용)
+        # 프레임별 유사도 계산
         frame_similarities = []
         min_length = min(len(user_sequence), len(reference_sequence))
         
@@ -210,7 +288,7 @@ class PoseSimilarityAnalyzer:
             )
             frame_similarities.append(sim)
         
-        # 가장 유사도가 낮은 구간 찾기 (개선 필요 부분)
+        # 가장 유사도가 낮은 구간
         if frame_similarities:
             worst_frame_idx = np.argmin(frame_similarities)
             worst_similarity = frame_similarities[worst_frame_idx]
@@ -227,7 +305,7 @@ class PoseSimilarityAnalyzer:
             len(reference_sequence)
         )
         
-        return {
+        result = {
             "success": True,
             "overall_similarity": similarity_score,
             "dtw_distance": dtw_dist,
@@ -236,6 +314,12 @@ class PoseSimilarityAnalyzer:
             "feedback": feedback,
             "speed_ratio": len(user_sequence) / len(reference_sequence)
         }
+        
+        # 전처리 통계 추가
+        if include_preprocessing_stats and self.preprocessor:
+            result["preprocessing_enabled"] = True
+        
+        return result
     
     def _generate_feedback(
         self,
@@ -273,30 +357,17 @@ class PoseSimilarityAnalyzer:
         return feedback
 
 
-# ============================================
-# 참조 영상 데이터베이스 (추후 실제 데이터로 교체)
-# ============================================
-
 class ReferenceVideoDatabase:
-    """
-    참조 영상 관리 시스템
-    
-    추후 실제 헬스케어 데이터로 교체 예정:
-    - 전문 물리치료사 시연 영상
-    - 다양한 각도의 시점
-    - 난이도별 분류
-    """
+    """참조 영상 관리 시스템"""
     
     def __init__(self):
-        # 현재는 플레이스홀더
-        # 추후 S3, DB 등에서 불러옴
         self.reference_videos = {
             "wrist_stretch_1": {
                 "title": "손목 신전 스트레칭",
                 "difficulty": "초급",
                 "duration_seconds": 30,
-                "video_url": "placeholder_for_future_data",  # 추후 실제 데이터
-                "pose_sequence_path": None,  # 미리 추출된 포즈 데이터 경로
+                "video_url": "placeholder_for_future_data",
+                "pose_sequence_path": None,
                 "description": "손목을 앞으로 뻗고 반대 손으로 당기는 동작"
             },
             "shoulder_stretch_1": {
@@ -306,8 +377,7 @@ class ReferenceVideoDatabase:
                 "video_url": "placeholder_for_future_data",
                 "pose_sequence_path": None,
                 "description": "양팔을 옆으로 벌려 원을 그리는 동작"
-            },
-            # 추후 수백 개의 운동 영상 추가
+            }
         }
     
     def get_reference_video(self, exercise_id: str) -> Optional[Dict]:
@@ -316,11 +386,9 @@ class ReferenceVideoDatabase:
     
     def list_exercises_by_area(self, pain_area: str) -> List[Dict]:
         """부위별 운동 목록"""
-        # 추후 DB 쿼리로 교체
         area_mapping = {
             "손목": ["wrist_stretch_1"],
             "어깨": ["shoulder_stretch_1"],
-            # ...
         }
         
         exercise_ids = area_mapping.get(pain_area, [])
@@ -331,24 +399,3 @@ class ReferenceVideoDatabase:
             }
             for ex_id in exercise_ids
         ]
-    
-    def precompute_reference_poses(self, video_path: str, exercise_id: str):
-        """
-        참조 영상의 포즈 시퀀스를 미리 계산하여 저장
-        (실시간 비교 시 매번 계산하지 않도록)
-        """
-        analyzer = PoseSimilarityAnalyzer()
-        pose_sequence = analyzer.extract_video_pose_sequence(video_path)
-        
-        # JSON 또는 pickle로 저장
-        output_path = f"data/reference_poses/{exercise_id}.json"
-        
-        # numpy array를 list로 변환 (JSON 직렬화용)
-        serializable_sequence = [pose.tolist() for pose in pose_sequence]
-        
-        with open(output_path, 'w') as f:
-            json.dump(serializable_sequence, f)
-        
-        print(f"✅ {exercise_id} 참조 포즈 저장 완료: {len(pose_sequence)} 프레임")
-        
-        return output_path
