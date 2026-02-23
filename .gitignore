@@ -23,3 +23,15 @@ alembic.ini
 data/
 
 docs/
+
+# =========================
+# ML / HF fine-tuning outputs
+# =========================
+artifacts/
+02_AI_Model_Development/hf_finetuning/datasets/generated/
+
+# =========================
+# ML artifacts / generated datasets
+# =========================
+artifacts/
+02_AI_Model_Development/hf_finetuning/rehab_json_lora/datasets/generated/

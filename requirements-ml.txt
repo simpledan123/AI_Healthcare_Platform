@@ -1,0 +1,7 @@
+# Hugging Face / PyTorch (ML 전용 의존성)
+torch
+transformers
+datasets
+accelerate
+scikit-learn
+pandas
