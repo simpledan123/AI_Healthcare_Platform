@@ -1,0 +1,12 @@
+{"id": 1, "pain_area": "손목", "severity": 6, "pain_description": "마우스 오래 쓰면 손목이 찌릿하고 시큰거려요", "expected_keywords": ["손목", "wrist"]}
+{"id": 2, "pain_area": "손목", "severity": 3, "pain_description": "손목이 뻐근하고 약간 불편해요", "expected_keywords": ["손목", "wrist"]}
+{"id": 3, "pain_area": "어깨", "severity": 7, "pain_description": "어깨가 뭉치고 팔을 들 때 불편합니다", "expected_keywords": ["어깨", "shoulder"]}
+{"id": 4, "pain_area": "어깨", "severity": 4, "pain_description": "오래 앉아 있으면 어깨가 결리고 뻐근해요", "expected_keywords": ["어깨", "shoulder"]}
+{"id": 5, "pain_area": "허리", "severity": 8, "pain_description": "오래 앉아 있으면 허리가 묵직하고 숙이면 통증이 심해져요", "expected_keywords": ["허리", "lower back"]}
+{"id": 6, "pain_area": "허리", "severity": 5, "pain_description": "허리 아래쪽이 뻐근하고 당기는 느낌이 있어요", "expected_keywords": ["허리", "lower back"]}
+{"id": 7, "pain_area": "목", "severity": 2, "pain_description": "목이 뻐근하고 뒷목이 당겨요", "expected_keywords": ["목", "neck"]}
+{"id": 8, "pain_area": "목", "severity": 6, "pain_description": "모니터 오래 보면 목이 결리고 뻣뻣해요", "expected_keywords": ["목", "neck"]}
+{"id": 9, "pain_area": "무릎", "severity": 7, "pain_description": "계단 내려갈 때 무릎 앞쪽이 아파요", "expected_keywords": ["무릎", "knee"]}
+{"id": 10, "pain_area": "무릎", "severity": 9, "pain_description": "무릎이 쑤시고 붓는 느낌이 있고 통증이 심해요", "expected_keywords": ["무릎", "knee"]}
+{"id": 11, "pain_area": "발목", "severity": 4, "pain_description": "발목이 불안정하고 약간 욱신거려요", "expected_keywords": ["발목", "ankle"]}
+{"id": 12, "pain_area": "발목", "severity": 8, "pain_description": "발목을 접질린 뒤로 붓고 걸을 때 아파요", "expected_keywords": ["발목", "ankle"]}

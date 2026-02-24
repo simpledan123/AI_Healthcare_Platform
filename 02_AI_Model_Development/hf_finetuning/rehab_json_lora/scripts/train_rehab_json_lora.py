@@ -145,7 +145,7 @@ def main(
         num_train_epochs=epochs,
         learning_rate=lr,
         fp16=torch.cuda.is_available(),
-        evaluation_strategy="steps",
+        eval_strategy="steps",
         eval_steps=200,
         save_steps=200,
         logging_steps=50,
