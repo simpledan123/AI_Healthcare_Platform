@@ -1,37 +1,12 @@
-# Python
+.env
 __pycache__/
 *.py[cod]
-venv/
-env/
-.env
-
-# Frontend (Node.js) - 🚨 절대 올리면 안 됨!
+.pytest_cache/
+.venv/
+backend/data/*.db
 frontend/node_modules/
 frontend/dist/
-frontend/.env
+data/uploads/
+data/reference_poses/*.json
+!data/reference_poses/.gitkeep
 
-# Database & Logs
-*.log
-*.sqlite3
-alembic.ini
-# (주의: 만약 DB 비밀번호가 들어있는 파일을 올리기 싫다면 alembic.ini도 추가해야 하지만, 
-# 지금은 공부용이니 일단 올려도 됩니다. 실무에선 절대 금지!)
-
-# IDE
-.vscode/
-.idea/
-data/
-
-docs/
-
-# =========================
-# ML / HF fine-tuning outputs
-# =========================
-artifacts/
-02_AI_Model_Development/hf_finetuning/datasets/generated/
-
-# =========================
-# ML artifacts / generated datasets
-# =========================
-artifacts/
-02_AI_Model_Development/hf_finetuning/rehab_json_lora/datasets/generated/

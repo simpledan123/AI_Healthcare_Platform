@@ -1,260 +1,232 @@
-# Physical AI Healthcare Platform
+# AI Rehabilitation Motion Review
 
-> **AI 기반 맞춤형 재활 가이드 & 실시간 인프라 최적화 시스템**  
-> 기본 추천은 **Claude(Anthropic)** 기반으로 동작하며, **Hugging Face/LoRA 파인튜닝 기능은 옵션(Add-on)** 으로 붙습니다.
+손목 부상 후 전문가 재활 영상을 따라 할 때, 동작이 실제로 얼마나 비슷한지 객관적으로 확인하기 위해 만든 개인 프로젝트입니다.
 
----
+전문가 영상과 사용자 영상에서 **MediaPipe Pose + Hands** 특징을 추출하고, **DTW(Dynamic Time Warping)** 로 수행 속도의 차이를 정렬합니다. 이후 관절·구간별 편차를 근거 데이터로 만들고, AI가 그 근거 안에서만 교정 피드백을 생성하도록 검수합니다. 신뢰도가 낮거나 안전 확인이 필요한 결과는 자동 제공하지 않고 사람 검토 작업으로 분기합니다.
 
-## 1) 프로젝트 소개
+> 이 프로젝트는 의료 진단이나 치료를 제공하지 않는 동작 비교 프로토타입입니다.
 
-본 프로젝트는 아래 3개의 축으로 구성된 통합 헬스케어 플랫폼입니다.
+## 무엇이 달라졌나
 
-1. **재활 운동 추천(Rehabilitation AI)**
-   - Claude 기반의 운동 추천 생성
-   - 백엔드/DB 처리를 위해 **JSON Strict Mode**로 응답 형식을 강제
-   - API 실패 시 **Fallback(내장 추천)** 으로 서비스 연속성 보장
-   - 추천 키워드 기반 **YouTube 검색 URL 자동 생성**
+기존 프로젝트의 핵심 아이디어는 유지하면서 실행 경로를 다시 구성했습니다.
 
-2. **자세 분석(Pose Analytics)**
-   - MediaPipe 기반 포즈 추출/수치화
-   - DTW(Dynamic Time Warping) 기반 유사도 비교
-   - 프레임 단위 실시간 피드백(웹캠) 제공
+- 전문가/사용자 영상의 Pose+Hands 특징 추출
+- DTW 누적 거리뿐 아니라 **실제 warping path** 복원
+- 정렬 경로를 기준으로 관절·구간별 편차 산출
+- 측정 근거를 벗어난 AI 피드백 차단
+- AI 모델·프롬프트 버전·입출력·지연·fallback 기록
+- 낮은 데이터 품질, 높은 통증 강도, 위험 표현의 검토 큐 분기
+- 임의 난수가 아닌 SQL 기록 기반 운영 대시보드
+- 원본 영상 미보관, 파생 특징만 선택적으로 저장
+- 실제 영상 없이 전체 흐름을 확인하는 결정적 데모 모드
 
-3. **지능형 인프라 제어(Physical AI / Infra)**
-   - Prophet 기반 트래픽 예측(24시간)
-   - 급증 탐지(Spike Detection) 및 서버 권장 대수 산출
-   - 주기적 재학습(6시간) 컨셉 적용
+## 시스템 흐름
 
----
+```mermaid
+flowchart LR
+    A[전문가·사용자 영상] --> B[Pose+Hands 특징]
+    B --> C[품질 검사]
+    C --> D[DTW 정렬]
+    D --> E[관절·구간 근거]
+    E --> F[AI 검수]
+    F --> G{근거·안전 검증}
+    G -->|통과| H[피드백·로그]
+    G -->|저신뢰| I[사람 검토]
+```
 
-## 2) 파인튜닝/로컬 모델 기능
+### 특징 벡터
 
-### A) 통증 부위 분류 모델(HF Fine-tuning)
-- 사용자의 `pain_description` → `pain_area` 자동 분류
-- FastAPI 엔드포인트 제공: `POST /api/rehabilitation/pain-area/predict`
-- `/recommend` 요청에서 `pain_area="AUTO"` 사용 시 자동 분류 결과로 보정 가능
+현재 오른손 손목 신전 동작을 기준으로 다음 6개 특징을 사용합니다.
 
-### B) 로컬 LoRA JSON 생성 모델(옵션)
-- “통증 정보 → 운동 추천 JSON”을 생성하는 로컬 모델(LoRA SFT)
-- Claude를 대체하는 것이 아니라,
-  - **별도 엔드포인트(`/recommend-local`)** 로 제공하거나
-  - **환경변수로만 엔진 선택(REHAB_REC_ENGINE)** 하도록 설계
-- 결과는 서버에서 JSON 파싱/정규화 후 DB 저장(안정성 강화)
+1. 오른쪽 팔꿈치 각도
+2. 오른쪽 손목 신전 각도
+3. 오른쪽 손바닥 벌림 각도
+4. 오른쪽 손목 X 위치
+5. 오른쪽 손목 Y 위치
+6. 오른쪽 손 펼침 폭
 
-### C) 데이터/학습/평가 파이프라인
-- DB → SFT(JSONL) Export
-- 품질 필터링(PR-F2): 짧은 텍스트 제거, exercise 최소 개수, 필드/범위 검증 등
-- 평가(PR-F1): JSON 파싱 성공률 / 규칙 통과율 / Pydantic 스키마 통과율 리포트 출력
+각도와 좌표 단위가 DTW 비용을 왜곡하지 않도록 특징별 기준 차이로 정규화합니다.
 
-### D)  LoRA 학습을 돌리고 adapter 저장 확인
+## 빠른 실행
 
+### 방법 A: Docker Compose
 
-- 합성 데이터셋(SFT JSONL) 준비 → LoRA 학습 실행 → **adapter 저장 성공**
-- 로컬 추론(LoRA adapter 로드 + `generate`) 실행 → 출력이 **엄격 JSON**을 만족하지 않아 파싱 실패 케이스 확인
-- 원인 분석 후 아래 개선/완화 적용:
-  - `app/services/__init__.py`의 **import side-effect 제거(lazy import)**: 로컬 추론이 Claude/pose(cv2) 의존성 없이 실행되도록 수정
-  - 프롬프트 템플릿 `{`/`}` 이스케이프 처리(`{{`, `}}`)
-  - GPT-2 계열(특히 distilgpt2) **컨텍스트 1024 토큰 제한** 대응: 입력 truncation + 남은 길이만 생성하도록 제한
-  - “닫는 괄호가 늦게/안 나오는” 케이스를 위해 JSON 추출 로직 개선(문자열 내부 중괄호 무시한 brace balancing)
-  - 반복 억제 옵션(repetition_penalty / no_repeat_ngram_size) 적용
-
-> ⚠️ 결론: **학습 자체는 성공**(loss/eval_loss 개선 및 adapter 저장)했지만,  
-> distilgpt2(소형/영어 중심) 기반에서 **한국어 + strict JSON 스키마 출력**은 안정적으로 수렴하지 않아  
-> 로컬 추론 단계에서 **유효 JSON 파싱 실패율이 높게 관찰**되었습니다.
-
----
-
-## 3) 설치 & 실행(백엔드)
-
-### 3.1 필수(기본 서버 기능)
 ```bash
-pip install -r requirements.txt
+cp .env.example .env
+docker compose up --build
+```
+
+- 웹 화면: <http://localhost:8080>
+- API 문서: <http://localhost:8000/docs>
+- n8n: <http://localhost:5678>
+
+첫 실행은 `AI_REVIEW_MODE=demo`입니다. API 키가 없어도 모든 화면과 SQL 로그, 검토 큐를 확인할 수 있습니다.
+
+### 방법 B: 데모만 로컬 실행
+
+백엔드:
+
+```bash
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt -r requirements-dev.txt
 uvicorn app.main:app --reload
 ```
 
-- API 문서: `http://localhost:8000/docs`
+프런트:
 
-### 3.2 선택(파인튜닝/로컬 모델 기능)
 ```bash
-pip install -r requirements.txt -r requirements-ml.txt
+cd frontend
+npm install
+npm run dev
 ```
 
-> 권장: 가상환경(venv/conda) 사용  
-> - Windows PowerShell: `python -m venv .venv` → `.\.venv\Scripts\Activate.ps1`
+실제 영상 분석까지 사용하려면 백엔드 환경에 아래 의존성을 추가합니다.
 
----
+```bash
+pip install -r requirements-vision.txt
+```
 
-## 4) 주요 환경변수
+## 데모 시나리오
 
-### (기본) Claude 추천
-- `ANTHROPIC_API_KEY` : Claude API 키
+1. 웹 화면에서 `데모 실행`을 선택합니다.
+2. 통증 강도를 1~7로 두고 실행하면 DTW 분석과 `RETRY` 피드백을 확인할 수 있습니다.
+3. 통증 강도를 8 이상으로 실행하면 결과가 `REVIEW`로 분기되고 SQL 검토 작업이 생성됩니다.
+4. `검토·운영` 탭에서 검토 의견을 남겨 작업을 종료할 수 있습니다.
+5. 대시보드의 분석 수, 유사도, 검토 대기 수가 실제 SQL 기록에 따라 변경됩니다.
 
-### (옵션) 통증 부위 분류 모델
-- `PAIN_AREA_MODEL_DIR` : HF 분류 모델 경로 (예: `artifacts/pain_area_classifier/best`)
+데모는 `backend/app/services/demo_data.py`에서 생성하는 합성 포즈 특징을 사용합니다. 데이터 출처, 검수 제공자, 검증 상태에 모두 `demo`가 표시됩니다.
 
-### (옵션) 로컬 LoRA 추천 모델
-- `REHAB_LOCAL_LORA_DIR` : LoRA adapter 경로 (예: `artifacts/rehab_json_lora/adapter`)
-- `REHAB_LOCAL_BASE_MODEL` : (선택) base model override
-- `REHAB_TRUST_REMOTE_CODE` : (선택) `true/false`
+## 실제 영상 사용
 
-### (옵션) 추천 엔진 선택(기본은 Claude 유지)
-- `REHAB_REC_ENGINE` (default: `claude`)
-  - `claude`
-  - `local`
-  - `claude_then_local`
-  - `local_then_claude`
+### 1. 전문가 기준 등록
 
----
+웹의 `전문가 기준 등록`에서 운동 ID, 버전, 설명과 영상을 입력합니다. 원본 영상은 임시 파일에서 처리한 뒤 삭제되고, 추출한 특징 시퀀스만 `reference_exercises`에 저장됩니다.
 
-## 5) 주요 API 엔드포인트
+### 2. 사용자 영상 분석
 
-> ⚠️ 라우팅 prefix는 라우터 include 방식에 따라 달라질 수 있습니다.  
-> 정확한 경로는 **`/docs`에서 최종 확인**하세요.
+`사용자 영상` 탭에서 전문가 기준과 비교할 영상을 올립니다. 오른손, 팔꿈치, 어깨가 함께 보이고 촬영 각도가 기준 영상과 유사해야 합니다.
 
-| 카테고리 | 경로 | 주요 기능 |
+### 3. AI 검수
+
+분석 결과는 다음 형태로 AI에 전달됩니다.
+
+```json
+{
+  "overall_similarity": 74.2,
+  "data_quality": 0.91,
+  "speed_ratio": 1.17,
+  "worst_segments": [
+    {
+      "start_percent": 42,
+      "end_percent": 47,
+      "joint": "right_wrist_extension",
+      "difference": 18.4,
+      "unit": "deg"
+    }
+  ]
+}
+```
+
+AI 교정 문장은 입력에 존재하는 관절과 수치를 근거에 포함해야 합니다. 근거가 맞지 않거나 JSON 스키마가 깨지면 결과를 폐기하고 결정적 정책 엔진으로 전환합니다.
+
+## AI 검수 모드
+
+### Demo
+
+```env
+AI_REVIEW_MODE=demo
+```
+
+- 외부 AI 호출 없음
+- `demo-policy-engine`으로 명시
+- 같은 입력에 같은 결과
+- UI·SQL·검토 분기 재현 목적
+
+### Claude live
+
+```env
+AI_REVIEW_MODE=live
+ANTHROPIC_API_KEY=your_key
+ANTHROPIC_MODEL=claude-sonnet-4-20250514
+```
+
+- Claude가 구조화된 검수 결과 생성
+- Pydantic 스키마 검사
+- 교정 문장과 측정 근거 일치 검사
+- API·파싱·근거 검증 실패 시 정책 엔진 fallback
+- 모든 제공자·모델·프롬프트 버전·입출력·fallback 여부 기록
+
+## SQL 데이터 구조
+
+| 테이블 | 역할 |
+| --- | --- |
+| `reference_exercises` | 전문가 기준 특징, 버전, 출처, 승인 여부 |
+| `pose_attempts` | DTW 점수, 데이터 품질, 속도비, 취약 구간 |
+| `ai_reviews` | AI 입출력, 근거 검증, 모델, latency, fallback |
+| `review_tasks` | 사람 검토 사유, 처리 상태와 검토 의견 |
+
+기본 로컬 데모는 SQLite를 사용하고 Docker Compose는 PostgreSQL을 사용합니다. SQLAlchemy 모델과 API는 동일합니다.
+
+## n8n 검토 알림
+
+`n8n/workflows/rehab-review-workflow.json`을 n8n에서 Import한 뒤 활성화하면 `/webhook/rehab-review`가 검토 이벤트를 받습니다. Slack이나 메일 노드를 연결하지 않아도 Webhook 수신, 검토 이벤트 정규화, 응답까지 재현할 수 있습니다.
+
+실제 알림 채널을 연결하려면 n8n에서 `Build Review Event` 뒤에 조직의 메시징 노드를 추가합니다.
+
+## 테스트
+
+```bash
+cd backend
+pytest -q
+```
+
+검증 항목:
+
+- 서로 다른 길이의 시퀀스가 DTW 경로로 정렬되는지
+- 동일 시퀀스가 100점에 가까운지
+- 데모 분석이 SQL 로그와 대시보드에 반영되는지
+- 통증 강도 8 이상이 사람 검토 작업으로 분기되는지
+
+프런트 빌드:
+
+```bash
+cd frontend
+npm ci
+npm run build
+```
+
+## API
+
+| Method | Path | 설명 |
 | --- | --- | --- |
-| Healthcare | `POST /api/rehabilitation/recommend` | 기본 추천(Claude/Fallback) 생성 + DB 저장 (`pain_area="AUTO"` 지원 가능) |
-| Healthcare (Add-on) | `POST /api/rehabilitation/recommend-local` | 로컬 LoRA 추천 생성 + DB 저장(옵션) |
-| Healthcare (Add-on) | `POST /api/rehabilitation/pain-area/predict` | 통증 설명 → 통증 부위 예측(HF/휴리스틱) |
-| Analytics | `GET /api/rehabilitation/statistics/{id}` | 추천/완료율/통증강도/운동 TOP3 등 통계 |
-| Pose | `POST /api/pose-comparison/compare` | 사용자 영상 vs 참조 영상 DTW 유사도 분석 |
-| Real-time | `POST /api/pose-comparison/realtime-frame-check` | 웹캠 프레임 단위 실시간 자세 피드백 |
-| Infra | `GET /infra/status` | 실시간 트래픽 상태 + 24시간 예측 + 서버 권장 |
-| Dashboard | `GET /dashboard/summary` | 분석 요약(차트/지표용) |
+| GET | `/health` | 서비스 상태와 검수 모드 |
+| GET | `/api/references` | 전문가 기준 목록 |
+| POST | `/api/references/import-video` | 전문가 영상 특징 등록 |
+| POST | `/api/attempts/demo` | 결정적 데모 전체 실행 |
+| POST | `/api/attempts/analyze` | 사용자 영상 분석·AI 검수 |
+| GET | `/api/attempts/{id}` | 분석 및 검수 로그 |
+| GET | `/api/review-tasks` | 사람 검토 작업 |
+| PATCH | `/api/review-tasks/{id}` | 검토 처리 |
+| GET | `/api/dashboard` | SQL 운영 지표 |
 
----
+## 개인정보·안전 원칙
 
-## 6) 파인튜닝/로컬 모델 폴더 안내
+- 원본 사용자 영상은 서버에 영구 저장하지 않습니다.
+- 기본 설정은 파생 특징만 저장합니다.
+- 실제 운영에서는 사용자 식별정보와 분석 데이터를 별도 저장하고 접근통제를 적용해야 합니다.
+- AI는 제공된 측정값을 설명할 뿐 진단하거나 치료를 처방하지 않습니다.
+- 높은 통증 강도와 위험 표현은 자동 피드백보다 사람 확인을 우선합니다.
+- 합성 데모와 전문가 승인 데이터는 UI와 DB에서 명확하게 구분합니다.
 
-### 6.1 통증 부위 분류(HF Fine-tuning)
-- 위치: `02_AI_Model_Development/hf_finetuning/`
-- 구성(예시):
-  - 데이터: `datasets/sample/`, `datasets/generated/`
-  - 학습: `scripts/train_pain_area_classifier.py`
-  - 추론: `app/services/hf_models/pain_area_classifier.py`
+## 현재 한계
 
-### 6.2 로컬 LoRA JSON 생성(옵션)
-- 위치: `02_AI_Model_Development/hf_finetuning/rehab_json_lora/`
-- 구성(예시):
-  - DB Export: `scripts/export_rehab_sft_from_db.py`
-  - 데이터 검증: `scripts/validate_rehab_sft_dataset.py`
-  - ✅ (추가) Compact 데이터 변환: `scripts/make_compact_dataset.py`
-  - LoRA 학습: `scripts/train_rehab_json_lora.py`
-  - 평가(PR-F1): `scripts/eval_rehab_json_generator.py`
-  - 로컬 추론: `app/services/hf_models/rehab_json_generator.py`
+- 오른손 손목 신전 동작을 기준으로 설계했습니다.
+- 단일 카메라 2D/준3D 랜드마크이므로 촬영 각도와 가림에 영향을 받습니다.
+- 데모 기준은 전문가 승인 데이터가 아닙니다.
+- 실제 임상 효용이나 치료 효과를 검증하지 않았습니다.
+- 운동별로 적절한 특징, 기준값, 촬영 지침을 별도로 검증해야 합니다.
 
----
+이 한계를 숨기지 않고 데이터 출처, 승인 상태, 품질, 검수 이력을 시스템에 함께 기록합니다.
 
-## 7) 시스템 구조(Project Structure)
-
-```text
-app/
-├── api/routers/      # API 엔드포인트 (Rehab, Pose, Infra, Analytics 등)
-├── services/         # 핵심 비즈니스 로직 (AI 추천, 전처리, 트래픽 예측)
-├── models/           # SQLAlchemy 기반 정규화된 DB 모델
-├── schemas/          # Pydantic 기반 데이터 검증 및 직렬화
-└── database.py       # DB 연결 및 세션 관리
-
-02_AI_Model_Development/
-└── hf_finetuning/    # (옵션) Hugging Face / LoRA 학습·평가 파이프라인
-```
-
----
-
-## 8) 실제 실행 재현(Windows PowerShell 기준)
-
-> 아래 커맨드는 **로컬 CPU 환경에서도** 실행 가능한 형태로 구성되어 있습니다.  
-> (GPU가 있으면 더 빠릅니다.)
-
-### 8.1 합성 데이터셋(이미 레포에 넣어둔 경우 생략 가능)
-- 예시 경로:
-  - `02_AI_Model_Development/hf_finetuning/rehab_json_lora/datasets/synth/train.jsonl`
-  - `02_AI_Model_Development/hf_finetuning/rehab_json_lora/datasets/synth/valid.jsonl`
-
-### 8.2 Compact 데이터셋 생성(권장)
-JSON이 길어지면 학습이 “닫는 괄호”를 충분히 못 보고 배울 수 있어, **응답을 짧게 압축한 compact dataset**으로 먼저 안정성을 높입니다.
-
-```powershell
-python 02_AI_Model_Development/hf_finetuning/rehab_json_lora/scripts/make_compact_dataset.py --inp 02_AI_Model_Development/hf_finetuning/rehab_json_lora/datasets/synth/train.jsonl --outp 02_AI_Model_Development/hf_finetuning/rehab_json_lora/datasets/synth/train_compact.jsonl
-python 02_AI_Model_Development/hf_finetuning/rehab_json_lora/scripts/make_compact_dataset.py --inp 02_AI_Model_Development/hf_finetuning/rehab_json_lora/datasets/synth/valid.jsonl --outp 02_AI_Model_Development/hf_finetuning/rehab_json_lora/datasets/synth/valid_compact.jsonl --max_items 500
-```
-
-### 8.3 LoRA 학습(distilgpt2, CPU-friendly)
-```powershell
-python 02_AI_Model_Development/hf_finetuning/rehab_json_lora/scripts/train_rehab_json_lora.py --model_name distilgpt2 --train_jsonl 02_AI_Model_Development/hf_finetuning/rehab_json_lora/datasets/synth/train_compact.jsonl --valid_jsonl 02_AI_Model_Development/hf_finetuning/rehab_json_lora/datasets/synth/valid_compact.jsonl --output_dir artifacts/rehab_json_lora_compact --epochs 1 --batch_size 1 --grad_accum 16 --max_length 384
-```
-
-완료 시 예:
-- `artifacts/rehab_json_lora_compact/adapter/` 생성
-
-### 8.4 로컬 추론(1-shot)
-```powershell
-$env:REHAB_LOCAL_LORA_DIR="artifacts\rehab_json_lora_compact\adapter"; python 02_AI_Model_Development/hf_finetuning/rehab_json_lora/scripts/quick_infer_rehab_json.py --pain_area 손목 --pain_description "마우스 오래 쓰면 손목이 찌릿해요" --severity 6
-```
-
-> ⚠️ 현재 distilgpt2 기반에서는 JSON strict 출력이 불안정할 수 있습니다(파싱 실패/문법 붕괴/반복).
-
-### 8.5 오프라인 평가 리포트(PR-F1)
-```powershell
-python 02_AI_Model_Development/hf_finetuning/rehab_json_lora/scripts/eval_rehab_json_generator.py --jsonl 02_AI_Model_Development/hf_finetuning/rehab_json_lora/datasets/synth/valid_compact.jsonl --mode local --out_json artifacts/rehab_json_lora_eval/report.json --failures_jsonl artifacts/rehab_json_lora_eval/failures.jsonl --max_samples 200
-```
-
----
-
-## 9) 산출물(Artifacts) 설명
-
-### 9.1 LoRA adapter 폴더(중요)
-예: `artifacts/rehab_json_lora_compact/adapter/`
-
-- `adapter_config.json`
-  - LoRA 설정(랭크, 타깃 모듈, base model 경로 등 메타데이터)
-- `adapter_model.safetensors` (또는 `.bin`)
-  - 실제 학습된 LoRA 가중치(“델타”)
-- 참고: adapter만으로는 추론 불가하며, **base model + adapter** 조합으로 로드합니다.
-
-### 9.2 체크포인트/Trainer 산출물(있을 수 있음)
-- `checkpoint-*` 폴더: 중간 저장(재개 학습용)
-- `trainer_state.json`, `training_args.bin`: 학습 기록/설정 저장
-
----
-
-## 10) 트러블슈팅(자주 만나는 오류)
-
-### A) `ModuleNotFoundError: torch / peft`
-```bash
-pip install -r requirements.txt -r requirements-ml.txt
-```
-
-### B) `TrainingArguments ... evaluation_strategy` 에러
-- Transformers 버전에 따라 `evaluation_strategy` → `eval_strategy`로 바뀐 경우가 있습니다.
-- 스크립트가 최신 버전과 맞지 않으면, 파라미터 이름을 맞추거나 transformers 버전을 고정하세요.
-
-### C) 로컬 추론에서 `anthropic` / `cv2` import 에러
-- 원인: `app/services/__init__.py`에서 서비스들을 “자동 import”하면, 로컬 추론에도 불필요한 의존성이 강제됩니다.
-- 해결: `__init__.py`는 가볍게 유지하고, 필요한 곳에서 직접 import 하거나 lazy import로 전환하세요.
-
-### D) `IndexError: index out of range` (1024 토큰 초과)
-- GPT-2 계열은 컨텍스트 길이 제한이 있어 프롬프트+생성 길이가 1024를 넘으면 터질 수 있습니다.
-- 해결: 입력 truncation + `max_new_tokens` 자동 제한(코드에 반영)
-
----
-
-## 11) 현재 상태 & 다음 개선 방향
-
-현재 상태:
-- ✅ LoRA 학습 파이프라인(데이터 → 학습 → adapter 저장) 검증 완료
-- ✅ 로컬 추론 실행/디버깅 완료(실제 `generate` 출력 확인)
-- ⚠️ distilgpt2 기반에서 **한국어 + strict JSON** 출력 안정성이 낮아 파싱 실패 케이스 존재
-
-다음 단계(권장):
-1) **한국어 베이스 모델로 교체**(예: KoGPT2 계열) 후 동일 파이프라인 재학습
-2) 디코딩 제약 강화(beam search, no-repeat 강화) + 실패 시 재시도(1~2회)
-3) 오프라인 평가 리포트(PR-F1)를 기준으로 개선 전/후 비교
-
----
-
-## 12) 안전/주의사항
-
-- 본 프로젝트의 추천은 **의료 조언이 아닙니다.** 
-- DB에서 학습 데이터를 Export할 경우, 개인정보/민감정보가 섞이지 않도록 주의하세요.
-- `artifacts/`, `datasets/generated/` 는 커밋하지 않도록 `.gitignore`로 관리하는 것을 권장합니다.

@@ -1,0 +1,58 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: rehab
+      POSTGRES_USER: rehab
+      POSTGRES_PASSWORD: rehab_demo_only
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U rehab -d rehab"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg2://rehab:rehab_demo_only@postgres:5432/rehab
+      AI_REVIEW_MODE: ${AI_REVIEW_MODE:-demo}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_MODEL: ${ANTHROPIC_MODEL:-claude-sonnet-4-20250514}
+      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://n8n:5678/webhook/rehab-review}
+      CORS_ORIGINS: http://localhost:5173,http://localhost:8080
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data/reference_poses:/app/data/reference_poses
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE_URL: http://localhost:8000
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+
+  n8n:
+    image: n8nio/n8n:1.102.4
+    environment:
+      N8N_DIAGNOSTICS_ENABLED: "false"
+      N8N_PERSONALIZATION_ENABLED: "false"
+      N8N_SECURE_COOKIE: "false"
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n/workflows:/workflows:ro
+
+volumes:
+  postgres_data:
+  n8n_data:
+

@@ -1,0 +1,82 @@
+{
+  "name": "Rehab Review Queue Webhook",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "rehab-review",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "1",
+      "name": "Review Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [260, 300],
+      "webhookId": "rehab-review"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "event",
+              "name": "event",
+              "value": "={{ $json.body.event }}",
+              "type": "string"
+            },
+            {
+              "id": "task_id",
+              "name": "task_id",
+              "value": "={{ $json.body.task_id }}",
+              "type": "number"
+            },
+            {
+              "id": "summary",
+              "name": "summary",
+              "value": "=검토 작업 #{{ $json.body.task_id }} · {{ $json.body.exercise }} · {{ $json.body.reason }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "2",
+      "name": "Build Review Event",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [500, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={ \"accepted\": true, \"task_id\": {{ $json.task_id }}, \"event\": \"{{ $json.event }}\" }",
+        "options": {}
+      },
+      "id": "3",
+      "name": "Acknowledge",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [740, 300]
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Review Webhook": {
+      "main": [[{"node": "Build Review Event", "type": "main", "index": 0}]]
+    },
+    "Build Review Event": {
+      "main": [[{"node": "Acknowledge", "type": "main", "index": 0}]]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "b2c18ad0-4bc5-42fc-8c76-c58196abbc2f",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}
+
